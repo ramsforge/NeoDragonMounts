@@ -233,8 +233,16 @@ public abstract class TameableDragonEntity extends TamableAnimal implements
         return this.entityData.get(DATA_FLYING);
     }
 
+    /// Sprinting is a proportional 1.5x. The previous `speed * 1.5F + 0.25F` added a constant on
+    /// top of the multiplier, and at the default 0.25 flying speed that constant was as large as
+    /// the base itself, so flight accelerated at 0.625 rather than 0.375. travel() is an
+    /// accelerate-and-drag loop - `v = (v + a) * 0.91` - which settles at `a * 0.91 / 0.09`, so a
+    /// sprinting dragon reached ~6.3 blocks/tick, about 126 blocks/s, roughly four times
+    /// elytra-with-rockets. Worse, the constant did not scale with the attribute, so no value of
+    /// baseFlyingSpeed could bring sprint travel below ~50 blocks/s. Dropping it makes the
+    /// attribute the single knob for travel speed, on the ground and in the air alike.
     public final float adjustSpeed(float speed) {
-        return this.isSprinting() ? speed * 1.5F + 0.25F : speed;
+        return this.isSprinting() ? speed * 1.5F : speed;
     }
 
     public final void setHoverDisabled(boolean disabled) {
