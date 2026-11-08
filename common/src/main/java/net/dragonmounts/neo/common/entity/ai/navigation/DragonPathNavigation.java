@@ -12,6 +12,18 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 public class DragonPathNavigation extends PathNavigation {
+    /// PathNavigation sizes the A* budget as `followRange * 16`, which assumes a flat ground search.
+    /// DragonNodeEvaluator also expands UP and DOWN, so the frontier grows with the cube of the
+    /// radius rather than the square, while the budget is still scaled as if it were flat. Every
+    /// node costs ~10 neighbour evaluations that each run a 27-block danger scan, so at the default
+    /// 64-block follow range (1024 nodes) a single path is tens of thousands of block lookups - and
+    /// it is recomputed every tick, because MoveToTargetSink re-paths once the walk target drifts a
+    /// single block and FollowOwner points that target at a live EntityTracker on the owner, who
+    /// moves far more than a block per tick while flying. Measured on a live 26.1.2 server: two
+    /// dragons held the server thread at 100% of a core with the tick loop ~29s behind. A dragon
+    /// that cannot find a walking route inside this many nodes should be flying there instead.
+    private static final int MAX_VISITED_NODES = 128;
+
     public final ServerDragonEntity dragon;
 
     public DragonPathNavigation(ServerDragonEntity dragon, Level level) {
@@ -31,7 +43,7 @@ public class DragonPathNavigation extends PathNavigation {
     @Override
     protected PathFinder createPathFinder(int maxVisitedNodes) {
         this.nodeEvaluator = new DragonNodeEvaluator();
-        return new PathFinder(this.nodeEvaluator, maxVisitedNodes);
+        return new PathFinder(this.nodeEvaluator, Math.min(maxVisitedNodes, MAX_VISITED_NODES));
     }
 
     @Override
